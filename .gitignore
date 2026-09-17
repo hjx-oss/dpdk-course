@@ -1,0 +1,19 @@
+.deps/
+**/build/
+**/__pycache__/
+*.pyc
+.DS_Store
+compile_commands.json
+*.log
+.local.env
+
+# Local presentation materials are not published.
+presentation/
+课件源文件/
+*.html
+口播*.md
+高清录制.md
+启动高清录制.command
+课程路线.md
+验证结果.json
+._*
