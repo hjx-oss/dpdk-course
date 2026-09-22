@@ -6,23 +6,18 @@
 
 ```text
 dpdk-course/
-├── README.md
-├── env.sh
-├── scripts/                  安装和隔离实验网络
-├── 03-recv/
-│   ├── src/main.c            第三集：接收报文
-│   ├── README.md
-│   ├── Makefile
-│   └── tests/
-└── 04-udp/
-    ├── src/
-    │   ├── main.c            初始化、收包、调用 UDP、发包和退出
-    │   ├── udp.c             检查请求并原地构造回复
-    │   └── udp.h             模块接口
-    ├── README.md
+├── env.sh                  加载仓库内的 DPDK 环境
+├── scripts/                安装依赖、创建隔离 veth
+├── 03-recv/                接收报文
+├── 04-udp/                 UDP 回显，使用静态邻居项
+├── 05-arp/                 ARP 双向解析、缓存与重试
+├── 06-icmp/                加入 IPv4 分发与 ICMP Echo
+└── 07-udp-api/             应用收发接口、端口分发与有界队列
+    ├── src/                本集完整 C 源码和头文件
+    ├── README.md           本集运行方法与参数
     ├── Makefile
-    ├── run.sh
-    └── tests/
+    ├── run.sh              自动演示
+    └── tests/              功能与边界检查
 ```
 
 代码需要 Linux。
@@ -43,7 +38,7 @@ cd dpdk-course
 ```bash
 sudo apt update
 sudo apt install -y build-essential pkg-config python3 python3-venv \
-  libnuma-dev curl ca-certificates xz-utils iproute2 ethtool util-linux
+  libnuma-dev curl ca-certificates xz-utils iproute2 ethtool util-linux iputils-ping
 ```
 
 公用服务器已经具备这些依赖时，直接跳过系统安装。下面的脚本只把构建工具、DPDK 源码和安装产物放进本仓库的 `.deps/`：
@@ -101,6 +96,30 @@ make -C 04-udp check
 
 完整检查还覆盖空载荷、二进制、1472 字节载荷、头部长度、校验和、非本机请求、分片拒绝、连续收发和空闲退出。详细边界见 [第四集说明](04-udp/README.md)。
 
+## 5. 跑第五集：ARP 主动查询与邻居表
+
+```bash
+bash 05-arp/run.sh
+```
+
+先让客户端自动学习服务端 MAC 并完成 UDP 回显，再让 DPDK 主动查询客户端 MAC，最后验证查询不存在的地址会有限重试并失败。缓存命中、到期、表满和分配失败也有独立测试。完整检查用 `source ./env.sh` 后执行 `make -C 05-arp check`，手动启动和参数见[第五集说明](05-arp/README.md)。
+
+## 6. 跑第六集：ICMP Echo
+
+```bash
+bash 06-icmp/run.sh
+```
+
+自动调用 Linux ping，确认三次探测均收到回复，再检查 UDP 回显，并回归第五集的主动 ARP 查询和重试。完整检查用 `source ./env.sh` 后执行 `make -C 06-icmp check`，手动启动和参数见[第六集说明](06-icmp/README.md)。
+
+## 7. 跑第七集：UDP 应用接口
+
+```bash
+bash 07-udp-api/run.sh
+```
+
+程序从 9002 端口主动发送消息，9000 端口做回显，9001 端口把 ASCII 小写转成大写；ARP 和 ping 继续正常工作。完整检查用 `source ./env.sh` 后执行 `make -C 07-udp-api check`。接口语义、队列与错误处理、手动运行参数见[第七集说明](07-udp-api/README.md)。
+
 ## 实验里的包怎么走
 
 ```text
@@ -115,7 +134,7 @@ Python UDP socket
                            192.0.2.2:9000
 ```
 
-`192.0.2.2` 由 C 程序判断，不配置到 Linux 的 `dpdk0` 上。第四集暂时给客户端设置静态邻居项，让它知道服务端的 MAC；第五集再加入 ARP。回复的目的 MAC、IP 和端口直接取自收到的请求。
+`192.0.2.2` 由 C 程序判断，不配置到 Linux 的 `dpdk0` 上。第四集暂时给客户端设置静态邻居项，让它知道服务端的 MAC；第五集起由 ARP 自动获得 MAC。第四至六集的回显沿请求返回；第七集由应用提供目的 IP 与端口，发送侧通过邻居表查询 MAC，也可以主动发起通信。
 
 脚本只在新建的 user/network namespace 中创建和配置 `client0 / dpdk0`，不更改宿主机物理网口、默认路由、驱动绑定或大页设置。AF_PACKET 仍经过 Linux 软件网络，这套实验验证功能，不测物理网卡旁路性能。[DPDK AF_PACKET 文档](https://doc.dpdk.org/guides-25.11/nics/af_packet.html)
 
@@ -125,3 +144,6 @@ Python UDP socket
 |---|---|---|
 | 03 | 收包、查看内容、归还 mbuf | [03-recv](03-recv/README.md) |
 | 04 | 识别 UDP 请求并回显 | [04-udp](04-udp/README.md) |
+| 05 | ARP 主动查询、应答、邻居表、过期与重试 | [05-arp](05-arp/README.md) |
+| 06 | IPv4 分发、ICMP Echo，保留 ARP 和 UDP | [06-icmp](06-icmp/README.md) |
+| 07 | UDP 应用接口、多个端口、主动发送与有界收发队列 | [07-udp-api](07-udp-api/README.md) |
